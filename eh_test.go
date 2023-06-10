@@ -149,3 +149,34 @@ func TestExampleFail(t *testing.T) {
 		t.Fatalf("Err should be nil %+v", res)
 	}
 }
+
+func TestUnwrap(t *testing.T) {
+	res := Result[int]{Ok: 1}
+	ok := res.Unwrap()
+	if ok != 1 {
+		t.Fatal("Unwrap should return 1")
+	}
+}
+
+func TestUnwrapPanic(t *testing.T) {
+	res := Result[int]{Err: fmt.Errorf("error")}
+	defer func() { recover() }()
+	_ = res.Unwrap()
+	t.Fatal("code should have panicked")
+}
+
+func TestUnwrapErr(t *testing.T) {
+	aErr := fmt.Errorf("error")
+	res := Result[int]{Err: aErr}
+	err := res.UnwrapErr()
+	if err != aErr {
+		t.Fatal("UnwrapErr should return error")
+	}
+}
+
+func TestUnwrapErrPanic(t *testing.T) {
+	res := Result[int]{Ok: 1}
+	defer func() { recover() }()
+	_ = res.UnwrapErr()
+	t.Fatal("code should have panicked")
+}

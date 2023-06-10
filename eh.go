@@ -33,19 +33,31 @@ func NewResult[T any](val T, err error) Result[T] {
 // panic with the error that was encountered.
 func (r Result[T]) ReturnIfErr() Result[T] {
 	if r.Err != nil {
-		panic(Error{r.Err})
+		panic(ehError{r.Err})
 	}
 	return r
 }
 
-// Error is used to wrap any errors that are raised because of calling
-// ReturnIfErr on a Result.
-type Error struct {
-	WrappedErr error
+// Unwrap returns the Ok value or panics if there is an error.
+func (r Result[T]) Unwrap() T {
+	if r.Err != nil {
+		panic(r.Err)
+	}
+	return r.Ok
 }
 
-func (e Error) Error() string {
-	return e.Error()
+// UnwrapErr returns the Err value or panics if there is no error.
+func (r Result[T]) UnwrapErr() error {
+	if r.Err == nil {
+		panic("expected the result to contain error")
+	}
+	return r.Err
+}
+
+// ehError is used to wrap any errors that are raised because of calling
+// ReturnIfErr on a Result.
+type ehError struct {
+	error
 }
 
 // EscapeHatch will recover from a panic that was raised from any error
@@ -54,11 +66,11 @@ func (e Error) Error() string {
 // error was not raised by eh then the same panic will be raised.
 func EscapeHatch[T any](res *Result[T]) {
 	if r := recover(); r != nil {
-		err, ok := r.(Error)
+		err, ok := r.(ehError)
 		if !ok {
-			// Panicking again because the recovered panic is not an Error
+			// Panicking again because the recovered panic is not an ehError
 			panic(r)
 		}
-		*res = Result[T]{Err: err.WrappedErr}
+		*res = Result[T]{Err: err.error}
 	}
 }
