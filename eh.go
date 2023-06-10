@@ -29,25 +29,25 @@ func NewResult[T any](val T, err error) Result[T] {
 	return Result[T]{val, err}
 }
 
-// ReturnIfErr checks if there is an error in the result and if so then it will
-// panic with the error that was encountered.
-func (r Result[T]) ReturnIfErr() Result[T] {
+// Eh checks if there is an error in the result and if so then it will
+// panic with the error that was encountered. If there is no error the Ok value is returned.
+func (r Result[T]) Eh() T {
 	if r.Err != nil {
 		panic(ehError{r.Err})
 	}
-	return r
+	return r.Ok
 }
 
-// Unwrap returns the Ok value or panics if there is an error.
-func (r Result[T]) Unwrap() T {
+// MustUnwrap returns the Ok value or panics if there is an error.
+func (r Result[T]) MustUnwrap() T {
 	if r.Err != nil {
 		panic(r.Err)
 	}
 	return r.Ok
 }
 
-// UnwrapErr returns the Err value or panics if there is no error.
-func (r Result[T]) UnwrapErr() error {
+// MustUnwrapErr returns the Err value or panics if there is no error.
+func (r Result[T]) MustUnwrapErr() error {
 	if r.Err == nil {
 		panic("expected the result to contain error")
 	}

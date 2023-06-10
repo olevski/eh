@@ -30,27 +30,22 @@ func divide(x int, y int) (int, error) {
 
 func doDivide(x int, y int) (res Result[int]) {
 	defer EscapeHatch(&res)
-	res = NewResult(divide(x, y)).ReturnIfErr()
-	return res
+	return NewResult(divide(x, y))
 }
 
 func doDivideMultiple(x int, y int) (res Result[int]) {
 	defer EscapeHatch(&res)
-	res = NewResult(divide(x, y)).ReturnIfErr()
-	res = NewResult(divide(x*2, y+2)).ReturnIfErr()
-	return res
+	val := NewResult(divide(x, y)).Eh()
+	return NewResult(divide(val+2, y))
 }
 
 func doDivideGoRoutine(x int, y int, res *Result[int], wg *sync.WaitGroup) {
 	defer wg.Done()
-	defer EscapeHatch(res)
-	*res = NewResult(divide(x, y)).ReturnIfErr()
+	*res = NewResult(divide(x, y))
 }
 
-func doDividePtr(x int, y int) (res *Result[int]) {
-	defer EscapeHatch(res)
-	ares := NewResult(divide(x, y)).ReturnIfErr()
-	return &ares
+func doDividePtr(x int, y int) (res Result[int]) {
+	return NewResult(divide(x, y))
 }
 
 func TestSimple(t *testing.T) {
@@ -131,8 +126,8 @@ func TestSimpleResultMultipleFail(t *testing.T) {
 func example(aFile string) (res Result[[]byte]) {
 	defer EscapeHatch(&res)
 	buff := make([]byte, 5)
-	file := NewResult(os.Open(aFile)).ReturnIfErr().Ok
-	NewResult(file.Read(buff)).ReturnIfErr()
+	file := NewResult(os.Open(aFile)).Eh()
+	_ = NewResult(file.Read(buff)).Eh()
 	return Result[[]byte]{Ok: buff}
 }
 
@@ -150,33 +145,33 @@ func TestExampleFail(t *testing.T) {
 	}
 }
 
-func TestUnwrap(t *testing.T) {
+func TestMustUnwrap(t *testing.T) {
 	res := Result[int]{Ok: 1}
-	ok := res.Unwrap()
+	ok := res.MustUnwrap()
 	if ok != 1 {
 		t.Fatal("Unwrap should return 1")
 	}
 }
 
-func TestUnwrapPanic(t *testing.T) {
+func TestMustUnwrapPanic(t *testing.T) {
 	res := Result[int]{Err: fmt.Errorf("error")}
 	defer func() { recover() }()
-	_ = res.Unwrap()
+	_ = res.MustUnwrap()
 	t.Fatal("code should have panicked")
 }
 
-func TestUnwrapErr(t *testing.T) {
+func TestMustUnwrapErr(t *testing.T) {
 	aErr := fmt.Errorf("error")
 	res := Result[int]{Err: aErr}
-	err := res.UnwrapErr()
+	err := res.MustUnwrapErr()
 	if err != aErr {
 		t.Fatal("UnwrapErr should return error")
 	}
 }
 
-func TestUnwrapErrPanic(t *testing.T) {
+func TestMustUnwrapErrPanic(t *testing.T) {
 	res := Result[int]{Ok: 1}
 	defer func() { recover() }()
-	_ = res.UnwrapErr()
+	_ = res.MustUnwrapErr()
 	t.Fatal("code should have panicked")
 }

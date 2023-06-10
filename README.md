@@ -26,12 +26,12 @@ func example(aFile string) []byte, error {
 Into this:
 
 ```go
-func example(aFile string) (res Result[[]byte]) {
-	defer EscapeHatch(&res)  // must have pointer to the named output Result
+func example(aFile string) (res eh.Result[[]byte]) {
+	defer eh.EscapeHatch(&res)  // must have pointer to the named output Result
 	buff := make([]byte, 5)
-	file := NewResult(os.Open(aFile)).ReturnIfErr().Ok
-	NewResult(file.Read(buff)).ReturnIfErr()
-	return Result[[]byte]{Ok: buff}
+	file := eh.NewResult(os.Open(aFile)).Eh()
+	_ = eh.NewResult(file.Read(buff)).Eh()
+	return eh.Result[[]byte]{Ok: buff}
 }
 ```
 
@@ -49,8 +49,11 @@ For a successful operation the output is like this:
 
 The library provides just a handful or public structs and functions:
 - `Result` structs to capture an outcome that can potentially result in an error
-- `ReturnIfErr` function (`?` was not possible) that will stop the current function from executing
-  if there is an error and return a `Result` that contains the error. 
+- `Eh` method (`?` was not possible) that will stop the current function from executing
+  if there is an error and return a `Result` that contains the error. If there is no error the `Result`
+  is unwrapped and the `Ok` value is returned. Just like Canadians add "eh" to the end of a sentence 
+  to make it a question, you can call `Eh` on a `Result` to get a similar functionality to the question
+  mark operator.
 - `EscapeHatch` function that should be deferred and given access to the enclosing
   function named `Result` argument so that the error can be recovered and the 
   enclosed function can be interrupted early if an error occurs.
@@ -61,5 +64,5 @@ A few simple steps to incorporate in your code:
 1. Return a named `Result` from your fuction
 2. `defer` the `EscapeHatch` function with pointer to the named `Result` argument
 3. Wrap functions that return `any, error` into `eh.NewResult` to get `Result`
-4. Call `ReturnIfErr()` on any `Result` to stop the execution if there is an error 
+4. Call `Eh()` on any `Result` to stop the execution if there is an error 
   and return `Result{Err: Error}` from the enclosing function.
