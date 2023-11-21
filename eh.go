@@ -38,6 +38,16 @@ func (r Result[T]) Eh() T {
 	return r.Ok
 }
 
+// IsOk returns true when result has no error and otherwise false
+func (r Result[T]) IsOk() bool {
+	return r.Err == nil
+}
+
+// IsErr returns true when result has error and otherwise false
+func (r Result[T]) IsErr() bool {
+	return r.Err != nil
+}
+
 // MustUnwrap returns the Ok value or panics if there is an error.
 func (r Result[T]) MustUnwrap() T {
 	if r.Err != nil {
@@ -52,6 +62,11 @@ func (r Result[T]) MustUnwrapErr() error {
 		panic("expected the result to contain error")
 	}
 	return r.Err
+}
+
+// Unwrap returns a value and an error
+func (r Result[T]) Unwrap() (T, error) {
+	return r.Ok, r.Err
 }
 
 // ehError is used to wrap any errors that are raised because of calling

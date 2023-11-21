@@ -133,14 +133,14 @@ func example(aFile string) (res Result[[]byte]) {
 
 func TestExample(t *testing.T) {
 	res := example("README.md")
-	if res.Err != nil {
+	if res.IsErr() {
 		t.Fatalf("Err is not nil %+v", res)
 	}
 }
 
 func TestExampleFail(t *testing.T) {
 	res := example("non-existing-file")
-	if res.Err == nil {
+	if res.IsOk() {
 		t.Fatalf("Err should be nil %+v", res)
 	}
 }
