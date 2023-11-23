@@ -15,6 +15,7 @@
 package eh
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"sync"
@@ -174,4 +175,170 @@ func TestMustUnwrapErrPanic(t *testing.T) {
 	defer func() { recover() }()
 	_ = res.MustUnwrapErr()
 	t.Fatal("code should have panicked")
+}
+
+func TestEscapeHatchErrOk(t *testing.T) {
+
+	divideSuccess := func() (_ok int, _err error) {
+		defer EscapeHatchErr(&_err)
+		val := NewResult(divide(4, 2)).Eh()
+		return val, nil
+	}
+
+	if val, err := divideSuccess(); val != 2 || err != nil {
+		t.Fatalf("divide result should be %d and should not have err", 2)
+	}
+}
+
+func TestEscapeHatchErrFail(t *testing.T) {
+
+	divideFail := func() (_ok int, _err error) {
+		defer EscapeHatchErr(&_err)
+		val := NewResult(divide(4, 0)).Eh()
+		return val, nil
+	}
+
+	if _, err := divideFail(); err.Error() != "divide by zero" {
+		t.Fatal("an error of 'divide by zero' should be captured")
+	}
+}
+
+func TestFallback(t *testing.T) {
+
+	fallbackVal := 100
+
+	divideFailWithFallback := func() (r Result[int]) {
+		defer Fallback(&r, fallbackVal)
+		val := NewResult(divide(4, 0)).Eh()
+		return Result[int]{Ok: val}
+	}
+
+	result := divideFailWithFallback()
+
+	if !result.IsOk() && result.MustUnwrap() != fallbackVal {
+		t.FailNow()
+	}
+
+}
+
+func TestFallbackAllError(t *testing.T) {
+
+	errFailFirstTime := errors.New("fail first time")
+	errFailSecondTime := errors.New("fail second time")
+	errFailThirdTime := errors.New("fail third time")
+
+	fallbackVal := 100
+
+	funcMayFail := func() (int, error) {
+		return 0, errFailFirstTime
+	}
+
+	divideFailWithErrorHandled := func() (r Result[int]) {
+		defer Fallback(&r, fallbackVal, errFailThirdTime, errFailSecondTime, errFailFirstTime)
+
+		val := NewResult(funcMayFail()).Eh()
+
+		return Result[int]{Ok: val}
+	}
+
+	result := divideFailWithErrorHandled()
+
+	if !result.IsOk() && result.Ok != fallbackVal {
+		t.FailNow()
+	}
+
+}
+
+func TestHandleMultipleError(t *testing.T) {
+
+	errFailFirstTime := errors.New("fail first time")
+	errFailSecondTime := errors.New("fail second time")
+	errFailThirdTime := errors.New("fail third time")
+
+	fallbackVal := 100
+
+	funcMayFail := func() (int, error) {
+		return 0, errFailFirstTime
+	}
+
+	divideFailMultipleError := func() (r Result[int]) {
+		defer Fallback(&r, fallbackVal, errFailThirdTime)
+		defer CatchError(&r, func(err error) int {
+			t.Log(err.Error())
+			FromFailable(errFailThirdTime).Eh()
+			return 0
+		}, errFailSecondTime)
+		defer CatchError(&r, func(err error) int {
+			t.Log(err.Error())
+			FromFailable(errFailSecondTime).Eh()
+			return 0
+		}, errFailFirstTime)
+
+		val := NewResult(funcMayFail()).Eh()
+
+		return Result[int]{Ok: val}
+	}
+
+	result := divideFailMultipleError()
+
+	if !result.IsOk() && result.Ok != fallbackVal {
+		t.FailNow()
+	}
+
+}
+
+func TestHandleAllError(t *testing.T) {
+
+	errFailFirstTime := errors.New("fail first time")
+	errFailSecondTime := errors.New("fail second time")
+	errFailThirdTime := errors.New("fail third time")
+
+	fallbackVal := 100
+
+	funcMayFail := func() (int, error) {
+		return 0, errFailFirstTime
+	}
+
+	divideFailWithErrorHandled := func() (r Result[int]) {
+		defer CatchError(&r, func(err error) int {
+			return fallbackVal
+		}, errFailThirdTime, errFailSecondTime, errFailFirstTime)
+
+		val := NewResult(funcMayFail()).Eh()
+
+		return Result[int]{Ok: val}
+	}
+
+	result := divideFailWithErrorHandled()
+
+	if !result.IsOk() && result.Ok != fallbackVal {
+		t.FailNow()
+	}
+
+}
+
+func TestHandleAnyError(t *testing.T) {
+
+	fallbackVal := 100
+
+	funcMayFail := func() (int, error) {
+		return 0, fmt.Errorf("I am an arbitrary error")
+	}
+
+	divideFailWithErrorHandled := func() (r Result[int]) {
+		defer CatchError(&r, func(err error) int {
+			return fallbackVal
+		})
+
+		val := NewResult(funcMayFail()).Eh()
+
+		return Result[int]{Ok: val}
+	}
+
+	result := divideFailWithErrorHandled()
+
+	if !result.IsOk() && result.Ok != fallbackVal {
+		t.FailNow()
+	}
+
 }

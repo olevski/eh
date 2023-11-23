@@ -46,6 +46,67 @@ For a successful operation the output is like this:
 ```
 {Ok:[60 33 100 111 99 116 121 112] Err: <nil>}
 ```
+Furthermore, it introduces a flattened style of error handling that leverages Go's `defer` mechanism, eliminating nested if statements. This approach allows for clearer code readability, following the principle of "success logic flows down, error handling flows up."
+
+We could turn this:
+```go
+var InMemoryErr = errors.New("inmemory record not found")
+var DbNotFoundError = errors.New("db record not found")
+var ApiNotFound = errors.New("api record not found")
+
+func tryFindFromMemory() (string, error) {return "", InMemoryErr }
+func tryFindFromDb() (string, error) {return "", DbNotFoundError }
+func tryFindFromApi() (string, error) {return "", ApiNotFound }
+
+func example() (string, error) {
+  val, err := tryFindFromMemory()
+  if err == nil {
+    return val  // success value returns here
+  }
+  if errors.Is(err, InMemoryErr) {
+    val, err = tryFindFromDb()
+    if err == nil {
+      return val
+    }
+  }
+  if errors.Is(err, DbNotFoundError) {
+    val, err = tryFindFromApi()
+    if err == nil {
+      return val
+    }
+  }
+  if errors.Is(err, ApiNotFound) {
+    return "I'm default value for ApiNotFound"
+  }
+  return "I'm default value for other errors"
+}
+
+```
+into this
+```go
+var InMemoryErr = errors.New("inmemory record not found")
+var DbNotFoundError = errors.New("db record not found")
+var ApiNotFound = errors.New("api record not found")
+
+func tryFindFromMemory() (string, error) {return "", InMemoryErr }
+func tryFindFromDb() (string, error) {return "", DbNotFoundError }
+func tryFindFromApi() (string, error) {return "", ApiNotFound }
+
+func example() (res eh.Result[string]) {
+   eh.Fallback(&res, "I'm default value for other errors")
+   eh.Fallback(&res, "I'm default value for ApiNotFound", ApiNotFound)
+   eh.CatchError(&res, func(error) {
+     return eh.NewResult(mayFailWithErr3()).Eh()
+   }, DbNotFoundError)
+   eh.CatchError(&res, func(error) {
+     return eh.NewResult(tryFindFromDb()).Eh()
+   }, InMemoryErr)
+
+  successVal := eh.NewResult(tryFindFromMemory()).Eh()
+  return eh.Result[string]{Ok: successVal}
+}
+
+```
 
 The library provides just a handful or public structs and functions:
 - `Result` structs to capture an outcome that can potentially result in an error
@@ -57,11 +118,13 @@ The library provides just a handful or public structs and functions:
 - `EscapeHatch` function that should be deferred and given access to the enclosing
   function named `Result` argument so that the error can be recovered and the 
   enclosed function can be interrupted early if an error occurs.
+- `CatchError` function should be deferred to correctly handle errors from the enclosed function before they reach the `EscapeHatch`.
+- `Fallback` function, which also serves as a deferred function, handles errors by providing a fallback value.
 
 ## Instructions
 
 A few simple steps to incorporate in your code:
-1. Return a named `Result` from your fuction
+1. Return a named `Result` from your function
 2. `defer` the `EscapeHatch` function with pointer to the named `Result` argument
 3. Wrap functions that return `any, error` into `eh.NewResult` to get `Result`
 4. Call `Eh()` on any `Result` to stop the execution if there is an error 
